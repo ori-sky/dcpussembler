@@ -22,5 +22,10 @@
 
 int main(int argc, char **argv)
 {
+    for(char line[1024]; !feof(stdin);)
+    {
+        fgets(line, 1024, stdin);
+        fprintf(stdout, "%s", line);
+    }
     return 0;
 }
