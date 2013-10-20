@@ -22,10 +22,111 @@
 #include <string.h>
 #include <ctype.h>
 
+uint16_t get_op(char *OP_str, uint16_t *special)
+{
+    /* multi-char constants are big endian so must convert OP to big endian
+     * before comparing
+     */
+    int32_t OP = htobe32(*(int32_t *)OP_str);
+
+    switch(OP)
+    {
+        // basic opcodes
+        case 'SET\0':
+            return 0x01;
+        case 'ADD\0':
+            return 0x02;
+        case 'SUB\0':
+            return 0x03;
+        case 'MUL\0':
+            return 0x04;
+        case 'MLI\0':
+            return 0x05;
+        case 'DIV\0':
+            return 0x06;
+        case 'DVI\0':
+            return 0x07;
+        case 'MOD\0':
+            return 0x08;
+        case 'MDI\0':
+            return 0x09;
+        case 'AND\0':
+            return 0x0A;
+        case 'BOR\0':
+            return 0x0B;
+        case 'XOR\0':
+            return 0x0C;
+        case 'SHR\0':
+            return 0x0D;
+        case 'ASR\0':
+            return 0x0E;
+        case 'SHL\0':
+            return 0x0F;
+        case 'IFB\0':
+            return 0x10;
+        case 'IFC\0':
+            return 0x11;
+        case 'IFE\0':
+            return 0x12;
+        case 'IFN\0':
+            return 0x13;
+        case 'IFG\0':
+            return 0x14;
+        case 'IFA\0':
+            return 0x15;
+        case 'IFL\0':
+            return 0x16;
+        case 'IFU\0':
+            return 0x17;
+        case 'ADX\0':
+            return 0x1A;
+        case 'SBX\0':
+            return 0x1B;
+        case 'STI\0':
+            return 0x1E;
+        case 'STD\0':
+            return 0x1F;
+        // special opcodes
+        case 'JSR\0':
+            *special = 0x01;
+            return 0;
+        case 'INT\0':
+            *special = 0x08;
+            return 0;
+        case 'IAG\0':
+            *special = 0x09;
+            return 0;
+        case 'IAS\0':
+            *special = 0x0A;
+            return 0;
+        case 'RFI\0':
+            *special = 0x0B;
+            return 0;
+        case 'IAQ\0':
+            *special = 0x0C;
+            return 0;
+        case 'HWN\0':
+            *special = 0x10;
+            return 0;
+        case 'HWQ\0':
+            *special = 0x11;
+            return 0;
+        case 'HWI\0':
+            *special = 0x12;
+            return 0;
+        default:
+            return 0xFF;
+    }
+}
+
 int main(int argc, char **argv)
 {
     char OP_str[5];
     //char B_str[9];
+
+    uint16_t OP;
+    uint16_t B;
+    uint16_t A;
 
     for(char line[1024]; !feof(stdin);)
     {
@@ -40,6 +141,17 @@ int main(int argc, char **argv)
         }
 
         fprintf(stdout, "OP_str=%s\n", OP_str);
+
+        OP = get_op(OP_str, &B);
+
+        if(OP == 0xFF)
+        {
+            fprintf(stderr, "unrecognized opcode\n");
+            break;
+        }
+
+        fprintf(stdout, "OP=0x%.4x\n", OP);
+        fprintf(stdout, "B =0x%.4x\n", B);
     }
 
     return 0;
