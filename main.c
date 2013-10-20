@@ -19,13 +19,28 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 int main(int argc, char **argv)
 {
+    char OP_str[5];
+    //char B_str[9];
+
     for(char line[1024]; !feof(stdin);)
     {
         fgets(line, 1024, stdin);
-        fprintf(stdout, "%s", line);
+        // TODO: if last char is not new line, read until end of line
+
+        sscanf(line, " %4s", OP_str);
+
+        for(unsigned char i=0; i<strlen(OP_str); ++i)
+        {
+            OP_str[i] = toupper(OP_str[i]);
+        }
+
+        fprintf(stdout, "OP_str=%s\n", OP_str);
     }
+
     return 0;
 }
