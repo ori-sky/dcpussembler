@@ -143,34 +143,33 @@ uint16_t get_op(char *OP_str, uint16_t *special)
     }
 }
 
-uint16_t get_value(char *s, int *num_extra, uint16_t *extra)
+uint16_t get_value(char *s, int *pos, int *num_extra, uint16_t *extra)
 {
-    int pos = 0;
     char unused[2];
 
     // left opening bracket
     int newpos = 0;
-    int is_left_bracket = sscanf(s, " %1[[]%n", unused, &newpos) == 1;
-    pos += newpos;
+    int is_left_bracket = sscanf(&s[*pos], " %1[[]%n", unused, &newpos) == 1;
+    *pos += newpos;
 
     int first_i;
     char first_s[5] = {0,0,0,0,0};
 
     // first integer
     newpos = 0;
-    int first_is_integer = sscanf(&s[pos], " %i%n", &first_i, &newpos) == 1;
-    pos += newpos;
+    int first_is_integer = sscanf(&s[*pos], " %i%n", &first_i, &newpos) == 1;
+    *pos += newpos;
 
     if(!first_is_integer)
     {
         // if first is not integer, first string
         newpos = 0;
-        if(sscanf(&s[pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", first_s, &newpos) != 1)
+        if(sscanf(&s[*pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", first_s, &newpos) != 1)
         {
             //fprintf(stderr, "missing literal or identifier\n");
             return 0xFF;
         }
-        pos += newpos;
+        *pos += newpos;
 
         // to upper
         for(unsigned char i=0; i<strlen(first_s); ++i)
@@ -179,13 +178,10 @@ uint16_t get_value(char *s, int *num_extra, uint16_t *extra)
         }
     }
 
-    first_is_integer ? fprintf(stdout, "first=%i\n", first_i)
-                     : fprintf(stdout, "first=%s\n", first_s);
-
     // if +
     newpos = 0;
-    int is_plus = sscanf(&s[pos], " %1[+]%n", unused, &newpos) == 1;
-    pos += newpos;
+    int is_plus = sscanf(&s[*pos], " %1[+]%n", unused, &newpos) == 1;
+    *pos += newpos;
 
     int second_i;
     char second_s[5] = {0,0,0,0,0};
@@ -195,19 +191,19 @@ uint16_t get_value(char *s, int *num_extra, uint16_t *extra)
     {
         // second integer
         newpos = 0;
-        second_is_integer = sscanf(&s[pos], " %i%n", &second_i, &newpos) == 1;
-        pos += newpos;
+        second_is_integer = sscanf(&s[*pos], " %i%n", &second_i, &newpos) == 1;
+        *pos += newpos;
 
         if(!second_is_integer)
         {
             // if second is not integer, first string
             newpos = 0;
-            if(sscanf(&s[pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", second_s, &newpos) != 1)
+            if(sscanf(&s[*pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", second_s, &newpos) != 1)
             {
                 //fprintf(stderr, "missing literal or identifier\n");
                 return 0xFF;
             }
-            pos += newpos;
+            *pos += newpos;
 
             // to upper
             for(unsigned char i=0; i<strlen(second_s); ++i)
@@ -216,18 +212,15 @@ uint16_t get_value(char *s, int *num_extra, uint16_t *extra)
             }
         }
 
-        second_is_integer ? fprintf(stdout, "second=%i\n", second_i)
-                          : fprintf(stdout, "second=%s\n", second_s);
-
     }
 
     // right closing bracket
     newpos = 0;
-    int is_right_bracket = sscanf(&s[pos], " %1[]]%n", unused, &newpos) == 1;
-    pos += newpos;
+    int is_right_bracket = sscanf(&s[*pos], " %1[]]%n", unused, &newpos) == 1;
+    *pos += newpos;
 
     // trailing non-whitespace characters
-    if(sscanf(&s[pos], " %1s", unused) == 1)
+    if(sscanf(&s[*pos], " %1s", unused) == 1)
     {
         //fprintf(stderr, "trailing non-whitespace characters\n");
         return 0xFF;
@@ -372,6 +365,8 @@ int main(int argc, char **argv)
     uint16_t B;
     uint16_t A;
 
+    unsigned int line_num = 1;
+
     for(char line[1024]; !feof(stdin);)
     {
         int pos = 0;
@@ -390,11 +385,13 @@ int main(int argc, char **argv)
         }
 
         // opcode
-        if(sscanf(line, " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", OP_str, &pos) != 1)
+        int newpos = 0;
+        if(sscanf(line, " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", OP_str, &newpos) != 1)
         {
-            fprintf(stderr, "syntax error at OP\n");
+            fprintf(stderr, "%u: syntax error at OP\n", line_num);
             break;
         }
+        pos += newpos;
 
         for(unsigned char i=0; i<strlen(OP_str); ++i)
         {
@@ -407,7 +404,7 @@ int main(int argc, char **argv)
         // invalid opcode
         if(OP == 0xFF)
         {
-            fprintf(stderr, "invalid value for OP\n");
+            fprintf(stderr, "%u: invalid value for OP\n", line_num);
             break;
         }
         // special opcode
@@ -417,12 +414,51 @@ int main(int argc, char **argv)
 
             int num_extra = 0;
             uint16_t extra[2];
-            A = get_value(&line[pos], &num_extra, extra);
+
+            A = get_value(line, &pos, &num_extra, extra);
 
             // syntax error
             if(A == 0xFF)
             {
-                fprintf(stderr, "syntax error at A\n");
+                fprintf(stderr, "%u: syntax error at A\n", line_num);
+                break;
+            }
+
+            fprintf(stdout, "A=0x%.4x\n", A);
+        }
+        // normal opcode
+        else
+        {
+            int num_extra = 0;
+            uint16_t extra[2];
+
+            char *ptr = strchr(line, ',');
+
+            if(ptr == NULL)
+            {
+                fprintf(stderr, "%u: missing operand(s)\n", line_num);
+                break;
+            }
+
+            // split into two strings at comma
+            *ptr = '\0';
+
+            B = get_value(line, &pos, &num_extra, extra);
+
+            if(B == 0xFF)
+            {
+                fprintf(stderr, "%u: syntax error at B\n", line_num);
+                break;
+            }
+
+            fprintf(stdout, "B=0x%.4x\n", B);
+
+            int p = 0;
+            A = get_value(&ptr[1], &p, &num_extra, extra);
+
+            if(A == 0xFF)
+            {
+                fprintf(stderr, "%u: syntax error at A\n", line_num);
                 break;
             }
 
