@@ -147,19 +147,90 @@ uint16_t get_value(char *s)
 {
     /* TODO
      * scan %[[]
-     * scan %d or %s
-     * scan + %d or %s
+     * scan %i or %s
+     * scan + %i or %s
      * scan %[]]
      */
 
     int pos = 0;
     char unused[2];
 
-    int left_bracket = sscanf(s, " %1[[]%n", unused, &pos) == 1;
+    // left opening bracket
+    int newpos = 0;
+    int is_left_bracket = sscanf(s, " %1[[]%n", unused, &newpos) == 1;
+    pos += newpos;
 
-    fprintf(stdout, "[=%d\n", left_bracket);
+    int first_i;
+    char first_s[5];
 
-    unsigned char right_bracket;
+    // first integer
+    newpos = 0;
+    int first_is_integer = sscanf(&s[pos], " %i%n", &first_i, &newpos) == 1;
+    pos += newpos;
+
+    if(!first_is_integer)
+    {
+        // if first is not integer, first string
+        newpos = 0;
+        if(sscanf(&s[pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", first_s, &newpos) != 1)
+        {
+            //fprintf(stderr, "missing literal or idenfier\n");
+            return 0xFF;
+        }
+        pos += newpos;
+    }
+
+    first_is_integer ? fprintf(stdout, "first=%i\n", first_i)
+                     : fprintf(stdout, "first=%s\n", first_s);
+
+    // if +
+    newpos = 0;
+    int is_plus = sscanf(&s[pos], " %1[+]%n", unused, &newpos) == 1;
+    pos += newpos;
+
+    if(is_plus)
+    {
+        int second_i;
+        char second_s[5];
+
+        // second integer
+        newpos = 0;
+        int second_is_integer = sscanf(&s[pos], " %i%n", &second_i, &newpos) == 1;
+        pos += newpos;
+
+        if(!second_is_integer)
+        {
+            // if second is not integer, first string
+            newpos = 0;
+            if(sscanf(&s[pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", second_s, &newpos) != 1)
+            {
+                //fprintf(stderr, "missing literal or idenfier\n");
+                return 0xFF;
+            }
+            pos += newpos;
+        }
+
+        second_is_integer ? fprintf(stdout, "second=%i\n", second_i)
+                          : fprintf(stdout, "second=%s\n", second_s);
+
+    }
+
+    // right closing bracket
+    newpos = 0;
+    int is_right_bracket = sscanf(&s[pos], " %1[]]%n", unused, &newpos) == 1;
+    pos += newpos;
+
+    // if brackets don't match
+    if(is_left_bracket > is_right_bracket)
+    {
+        //fprintf(stderr, "missing closing bracket\n");
+        return 0xFF;
+    }
+    else if(is_left_bracket < is_right_bracket)
+    {
+        //fprintf(stderr, "missing opening bracket\n");
+        return 0xFF;
+    }
 
     return 0;
 }
@@ -167,7 +238,6 @@ uint16_t get_value(char *s)
 int main(int argc, char **argv)
 {
     char OP_str[5];
-    //char B_str[9];
 
     uint16_t OP;
     uint16_t B;
@@ -180,7 +250,12 @@ int main(int argc, char **argv)
         fgets(line, 1024, stdin);
         // TODO: if last char is not new line, read until end of line
 
-        sscanf(line, " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", OP_str, &pos);
+        // opcode
+        if(sscanf(line, " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", OP_str, &pos) != 1)
+        {
+            fprintf(stderr, "syntax error at OP\n");
+            break;
+        }
 
         for(unsigned char i=0; i<strlen(OP_str); ++i)
         {
@@ -190,16 +265,26 @@ int main(int argc, char **argv)
         OP = get_op(OP_str, &B);
         fprintf(stdout, "OP=0x%.4x\n", OP);
 
-        if(OP == 0xFF) // unrecognized opcode
+        // invalid opcode
+        if(OP == 0xFF)
         {
-            fprintf(stderr, "unrecognized opcode\n");
+            fprintf(stderr, "invalid value for OP\n");
             break;
         }
-        else if(OP == 0) // special opcode
+        // special opcode
+        else if(OP == 0)
         {
             fprintf(stdout, "B=0x%.4x\n", B);
 
             A = get_value(&line[pos]);
+
+            // syntax error
+            if(A == 0xFF)
+            {
+                fprintf(stderr, "syntax error at A\n");
+                break;
+            }
+
             fprintf(stdout, "A=0x%.4x\n", A);
         }
 
