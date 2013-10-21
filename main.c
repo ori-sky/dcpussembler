@@ -143,15 +143,8 @@ uint16_t get_op(char *OP_str, uint16_t *special)
     }
 }
 
-uint16_t get_value(char *s)
+uint16_t get_value(char *s, int *num_extra, uint16_t *extra)
 {
-    /* TODO
-     * scan %[[]
-     * scan %i or %s
-     * scan + %i or %s
-     * scan %[]]
-     */
-
     int pos = 0;
     char unused[2];
 
@@ -161,7 +154,7 @@ uint16_t get_value(char *s)
     pos += newpos;
 
     int first_i;
-    char first_s[5];
+    char first_s[5] = {0,0,0,0,0};
 
     // first integer
     newpos = 0;
@@ -174,10 +167,16 @@ uint16_t get_value(char *s)
         newpos = 0;
         if(sscanf(&s[pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", first_s, &newpos) != 1)
         {
-            //fprintf(stderr, "missing literal or idenfier\n");
+            //fprintf(stderr, "missing literal or identifier\n");
             return 0xFF;
         }
         pos += newpos;
+
+        // to upper
+        for(unsigned char i=0; i<strlen(first_s); ++i)
+        {
+            first_s[i] = toupper(first_s[i]);
+        }
     }
 
     first_is_integer ? fprintf(stdout, "first=%i\n", first_i)
@@ -188,14 +187,15 @@ uint16_t get_value(char *s)
     int is_plus = sscanf(&s[pos], " %1[+]%n", unused, &newpos) == 1;
     pos += newpos;
 
+    int second_i;
+    char second_s[5] = {0,0,0,0,0};
+    int second_is_integer;
+
     if(is_plus)
     {
-        int second_i;
-        char second_s[5];
-
         // second integer
         newpos = 0;
-        int second_is_integer = sscanf(&s[pos], " %i%n", &second_i, &newpos) == 1;
+        second_is_integer = sscanf(&s[pos], " %i%n", &second_i, &newpos) == 1;
         pos += newpos;
 
         if(!second_is_integer)
@@ -204,10 +204,16 @@ uint16_t get_value(char *s)
             newpos = 0;
             if(sscanf(&s[pos], " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", second_s, &newpos) != 1)
             {
-                //fprintf(stderr, "missing literal or idenfier\n");
+                //fprintf(stderr, "missing literal or identifier\n");
                 return 0xFF;
             }
             pos += newpos;
+
+            // to upper
+            for(unsigned char i=0; i<strlen(second_s); ++i)
+            {
+                second_s[i] = toupper(second_s[i]);
+            }
         }
 
         second_is_integer ? fprintf(stdout, "second=%i\n", second_i)
@@ -223,27 +229,144 @@ uint16_t get_value(char *s)
     // trailing non-whitespace characters
     if(sscanf(&s[pos], " %1s", unused) == 1)
     {
+        //fprintf(stderr, "trailing non-whitespace characters\n");
         return 0xFF;
     }
 
     // if brackets don't match
-    if(is_left_bracket > is_right_bracket)
+    if(is_left_bracket != is_right_bracket)
     {
-        //fprintf(stderr, "missing closing bracket\n");
-        return 0xFF;
-    }
-    else if(is_left_bracket < is_right_bracket)
-    {
-        //fprintf(stderr, "missing opening bracket\n");
+        //fprintf(stderr, "brackets not matching\n");
         return 0xFF;
     }
 
-    return 0;
+    // value conditions
+
+    if(!is_left_bracket && !is_plus)
+    {
+        if(first_is_integer)
+        {
+            // literal value
+            if(first_i >= -1 && first_i <= 30)
+            {
+                return (0x21 + first_i);
+            }
+            // next word literal value
+            else
+            {
+                extra[(*num_extra)++] = first_i;
+                return 0x1F;
+            }
+        }
+
+        int32_t first = htobe32(*(int32_t *)first_s);
+
+        switch(first)
+        {
+            case 'A\0\0\0':
+                return 0x00;
+            case 'B\0\0\0':
+                return 0x01;
+            case 'C\0\0\0':
+                return 0x02;
+            case 'X\0\0\0':
+                return 0x03;
+            case 'Y\0\0\0':
+                return 0x04;
+            case 'Z\0\0\0':
+                return 0x05;
+            case 'I\0\0\0':
+                return 0x06;
+            case 'J\0\0\0':
+                return 0x02;
+            case 'PUSH':
+            case 'POP\0':
+                return 0x18;
+            case 'PEEK':
+                return 0x19;
+            case 'SP\0\0':
+                return 0x1B;
+            case 'PC\0\0':
+                return 0x1C;
+            case 'EX\0\0':
+                return 0x1D;
+        }
+    }
+    else if(is_left_bracket && !is_plus)
+    {
+        if(first_is_integer)
+        {
+            extra[(*num_extra)++] = first_i;
+            return 0x1E;
+        }
+
+        int32_t first = htobe32(*(int32_t *)first_s);
+
+        switch(first)
+        {
+            case 'A\0\0\0':
+                return 0x08;
+            case 'B\0\0\0':
+                return 0x09;
+            case 'C\0\0\0':
+                return 0x0A;
+            case 'X\0\0\0':
+                return 0x0B;
+            case 'Y\0\0\0':
+                return 0x0C;
+            case 'Z\0\0\0':
+                return 0x0D;
+            case 'I\0\0\0':
+                return 0x0E;
+            case 'J\0\0\0':
+                return 0x0F;
+            case 'SP\0\0':
+                return 0x19;
+        }
+    }
+    else if(is_left_bracket && is_plus && !first_is_integer && second_is_integer)
+    {
+        int32_t first = htobe32(*(int32_t *)first_s);
+
+        switch(first)
+        {
+            case 'A\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x10;
+            case 'B\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x11;
+            case 'C\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x12;
+            case 'X\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x13;
+            case 'Y\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x14;
+            case 'Z\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x15;
+            case 'I\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x16;
+            case 'J\0\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x17;
+            case 'SP\0\0':
+                extra[(*num_extra)++] = second_i;
+                return 0x1A;
+        }
+    }
+
+    //fprintf(stderr, "invalid value\n");
+    return 0xFF;
 }
 
 int main(int argc, char **argv)
 {
-    char OP_str[5];
+    char OP_str[5] = {0,0,0,0,0};
 
     uint16_t OP;
     uint16_t B;
@@ -292,7 +415,9 @@ int main(int argc, char **argv)
         {
             fprintf(stdout, "B=0x%.4x\n", B);
 
-            A = get_value(&line[pos]);
+            int num_extra = 0;
+            uint16_t extra[2];
+            A = get_value(&line[pos], &num_extra, extra);
 
             // syntax error
             if(A == 0xFF)
