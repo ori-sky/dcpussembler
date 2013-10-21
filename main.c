@@ -369,6 +369,9 @@ int main(int argc, char **argv)
 
     for(char line[1024]; !feof(stdin);)
     {
+        int num_extra = 0;
+        uint16_t extra[2];
+
         int pos = 0;
 
         fgets(line, 1024, stdin);
@@ -399,7 +402,7 @@ int main(int argc, char **argv)
         }
 
         OP = get_op(OP_str, &B);
-        fprintf(stdout, "OP=0x%.4x\n", OP);
+        //fprintf(stdout, "OP=0x%.4x\n", OP);
 
         // invalid opcode
         if(OP == 0xFF)
@@ -410,10 +413,7 @@ int main(int argc, char **argv)
         // special opcode
         else if(OP == 0)
         {
-            fprintf(stdout, "B=0x%.4x\n", B);
-
-            int num_extra = 0;
-            uint16_t extra[2];
+            //fprintf(stdout, "B=0x%.4x\n", B);
 
             A = get_value(line, &pos, &num_extra, extra);
 
@@ -424,14 +424,11 @@ int main(int argc, char **argv)
                 break;
             }
 
-            fprintf(stdout, "A=0x%.4x\n", A);
+            //fprintf(stdout, "A=0x%.4x\n", A);
         }
         // normal opcode
         else
         {
-            int num_extra = 0;
-            uint16_t extra[2];
-
             char *ptr = strchr(line, ',');
 
             if(ptr == NULL)
@@ -451,7 +448,7 @@ int main(int argc, char **argv)
                 break;
             }
 
-            fprintf(stdout, "B=0x%.4x\n", B);
+            //fprintf(stdout, "B=0x%.4x\n", B);
 
             int p = 0;
             A = get_value(&ptr[1], &p, &num_extra, extra);
@@ -462,10 +459,23 @@ int main(int argc, char **argv)
                 break;
             }
 
-            fprintf(stdout, "A=0x%.4x\n", A);
+            //fprintf(stdout, "A=0x%.4x\n", A);
         }
 
-        fputc('\n', stdout);
+        uint16_t instruction = OP | (B << 5) | (A << 10);
+
+        // output
+
+        freopen(NULL, "wb", stdout);
+
+        uint16_t be_inst = htobe16(instruction);
+        fwrite(&be_inst, sizeof(uint16_t), 1, stdout);
+
+        for(int i=num_extra-1; i>=0; --i)
+        {
+            uint16_t be = htobe16(extra[i]);
+            fwrite(&be, sizeof(uint16_t), 1, stdout);
+        }
     }
 
     return 0;
