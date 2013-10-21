@@ -143,6 +143,27 @@ uint16_t get_op(char *OP_str, uint16_t *special)
     }
 }
 
+uint16_t get_value(char *s)
+{
+    /* TODO
+     * scan %[[]
+     * scan %d or %s
+     * scan + %d or %s
+     * scan %[]]
+     */
+
+    int pos = 0;
+    char unused[2];
+
+    int left_bracket = sscanf(s, " %1[[]%n", unused, &pos) == 1;
+
+    fprintf(stdout, "[=%d\n", left_bracket);
+
+    unsigned char right_bracket;
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char OP_str[5];
@@ -154,28 +175,35 @@ int main(int argc, char **argv)
 
     for(char line[1024]; !feof(stdin);)
     {
+        int pos = 0;
+
         fgets(line, 1024, stdin);
         // TODO: if last char is not new line, read until end of line
 
-        sscanf(line, " %4s", OP_str);
+        sscanf(line, " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", OP_str, &pos);
 
         for(unsigned char i=0; i<strlen(OP_str); ++i)
         {
             OP_str[i] = toupper(OP_str[i]);
         }
 
-        fprintf(stdout, "OP_str=%s\n", OP_str);
-
         OP = get_op(OP_str, &B);
+        fprintf(stdout, "OP=0x%.4x\n", OP);
 
-        if(OP == 0xFF)
+        if(OP == 0xFF) // unrecognized opcode
         {
             fprintf(stderr, "unrecognized opcode\n");
             break;
         }
+        else if(OP == 0) // special opcode
+        {
+            fprintf(stdout, "B=0x%.4x\n", B);
 
-        fprintf(stdout, "OP=0x%.4x\n", OP);
-        fprintf(stdout, "B =0x%.4x\n", B);
+            A = get_value(&line[pos]);
+            fprintf(stdout, "A=0x%.4x\n", A);
+        }
+
+        fputc('\n', stdout);
     }
 
     return 0;
