@@ -220,6 +220,12 @@ uint16_t get_value(char *s)
     int is_right_bracket = sscanf(&s[pos], " %1[]]%n", unused, &newpos) == 1;
     pos += newpos;
 
+    // trailing non-whitespace characters
+    if(sscanf(&s[pos], " %1s", unused) == 1)
+    {
+        return 0xFF;
+    }
+
     // if brackets don't match
     if(is_left_bracket > is_right_bracket)
     {
@@ -248,7 +254,17 @@ int main(int argc, char **argv)
         int pos = 0;
 
         fgets(line, 1024, stdin);
-        // TODO: if last char is not new line, read until end of line
+
+        // ignore rest of line
+        if(line[strlen(line) - 1] != EOF && line[strlen(line) - 1] != '\n'
+           && line[strlen(line) - 1] != '\r')
+        {
+            for(;;)
+            {
+                char c = fgetc(stdin);
+                if(c == EOF || c == '\n' || c == '\r') break;
+            }
+        }
 
         // opcode
         if(sscanf(line, " %4[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]%n", OP_str, &pos) != 1)
